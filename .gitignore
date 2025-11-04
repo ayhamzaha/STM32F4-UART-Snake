@@ -1,0 +1,33 @@
+# build outputs
+*.axf
+*.elf
+*.hex
+*.bin
+
+# object files
+*.o
+*.d
+*.crf
+*.htm
+*.lst
+*.sct
+*.map
+
+# uvision build folders
+Objects/*
+Listings/*
+DebugConfig/*
+
+# uvision project files
+*.uvguix.*
+*.uvgui.*
+*.uvoptx
+
+# backup/temp
+*.bak
+*.dep
+*.lnp
+*.uvpack
+
+# other
+
