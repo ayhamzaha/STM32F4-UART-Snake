@@ -1,41 +1,5 @@
-#include "stm32f446xx.h"
-#include "../Inc/queue.h"
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include "../Inc/main.h"
 
-#define TX_PIN 2U // PA2
-#define RX_PIN 3U // PA3
-#define BTN1 3U // PB3
-#define BTN2 5U // PB5
-#define BTN_DEBOUNCE_MS 10U
-#define CLK_SPEED (16U * 1000U * 1000U)
-#define SCREEN_RFRSH_RATE 200U // in ms
-
-void Init_USART2(uint32_t baud);
-void Init_BTNs(void);
-void Init_Timer_us(void);
-void Init_Timer_ms(void);
-void USART_Q_Transmit_NonBlocking(Q_T *q, char * buf, uint8_t size);
-void Refresh_Screen(uint8_t xpos, uint8_t ypos);
-void Delay_ms(uint32_t ms);
-
-
-Q_T TxQ;
-
-
-void USART2_IRQHandler(void){
-	// Make sure transmit buffer is empty
-	if(USART2->SR & USART_SR_TXE) {
-		// Writing to data register clears T-E
-		if(!Q_Empty(&TxQ)) {
-			USART2->DR = Q_Dequeue(&TxQ);
-		} else {
-			// Disable transmitter interrupt
-			USART2->CR1 &= ~(0x1U << USART_CR1_TXEIE_Pos);
-		}
-	}
-}
 char buffer[8][17] = {{'-',' ','-',' ','-',' ','-',' ','-',' ','-',' ','-',' ','-','\n'},
 										  {'-',' ','-',' ','-',' ','-',' ','-',' ','-',' ','-',' ','-','\n'},
 											{'-',' ','-',' ','-',' ','-',' ','-',' ','-',' ','-',' ','-','\n'},
@@ -87,8 +51,6 @@ void EXTI3_IRQHandler(void) {
 	}
 	EXTI->PR = (0x1U << BTN1);
 }
-
-
 											
 void EXTI9_5_IRQHandler(void) {
 	// BTN2 clicked
@@ -151,42 +113,7 @@ int main(void) {
 	
 	} //debug incase start_game is 0 somehow
 }
-void Init_USART2(uint32_t baud) {
-	// Enable peripheral clocks
-	RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
-	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
-	
-	// Set mode for TX and RX pins to AF (10)
-	GPIOA->MODER &= ~((0x3U << (TX_PIN*2)) | (0x3U << (RX_PIN*2)));
-	GPIOA->MODER |= (0x2U << (TX_PIN*2)) | (0x2U << (RX_PIN*2));
-	
-	// Set AF register to be USART2 RX and TX (AF7)
-	GPIOA->AFR[0] |= (0x7U << (TX_PIN*4)) | (0x7U << (RX_PIN*4));
-	
-	// Set baud rate
-	USART2->BRR = CLK_SPEED/baud;
-	
-	// No parity
-	USART2->CR1 &= ~(0x1U << USART_CR1_PCE_Pos);
-	
-	// 8 data bits
-	USART2->CR1 &= ~(0x1U << USART_CR1_M_Pos);
-	
-	// 1 stop bit
-	USART2->CR2 &= ~(0x3U << USART_CR2_STOP_Pos);
-	
-	// Enable interrupt generation on transmit/receive
-	USART2->CR1 |= (0x1U << 5U) | (0x1U << 7U);
-	
-	// Enable USART2
-	USART2->CR1 |= (0x1U << USART_CR1_RE_Pos) | (0x1U << USART_CR1_TE_Pos);
-	USART2->CR1 |= (0x1U << USART_CR1_UE_Pos);
-	
-	// Configure and enable NVIC for USART2
-	NVIC_SetPriority(USART2_IRQn, 2);
-	NVIC_ClearPendingIRQ(USART2_IRQn);
-	NVIC_EnableIRQ(USART2_IRQn);
-}
+
 void Init_BTNs(void) {
 	// Enable peripheral clock
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
@@ -218,45 +145,6 @@ void Init_BTNs(void) {
 	NVIC_SetPriority(EXTI9_5_IRQn, 1);
 	NVIC_ClearPendingIRQ(EXTI9_5_IRQn);
 	NVIC_EnableIRQ(EXTI9_5_IRQn);
-}
-
-void Init_Timer_us(void){
-	// 1 us per tick timer
-	// Enable peripheral clock (TIM2)
-	RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
-	TIM2->PSC = 15U;
-	TIM2->ARR = 0xFFFFFFFEU;
-	TIM2->EGR |= TIM_EGR_UG;
-	TIM2->CR1 |= TIM_CR1_CEN;
-}
-
-void Init_Timer_ms(void){
-	// 1 ms per tick timer
-	// Enable peripheral clock (TIM5)
-	RCC->APB1ENR |= RCC_APB1ENR_TIM5EN;
-	TIM5->PSC = 15999U;
-	TIM5->ARR = 0xFFFFFFFEU;
-	TIM5->EGR |= TIM_EGR_UG;
-	TIM5->CR1 |= TIM_CR1_CEN;
-}
-
-void Delay_ms(uint32_t ms) {
-	TIM5->CNT = 0;
-	while(TIM5->CNT < ms) __ASM("NOP");
-}
-
-void USART_Q_Transmit_NonBlocking(Q_T *q, char * buf, uint8_t size) {
-	// Loop through all chars to be sent
-	while(size > 0) {
-		// Busy-wait until queue is not full
-		while(Q_Full(q)) __ASM("NOP");
-		// Add char to transmit queue
-		Q_Enqueue(q, *buf);
-		buf++;
-		size--;
-	}
-	// Ensure we will get a transmit buffer empty interrupt
-	USART2->CR1 |= (0x1U << USART_CR1_TXEIE_Pos);
 }
 
 void Refresh_Screen(uint8_t xpos, uint8_t ypos) {
