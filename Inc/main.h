@@ -12,12 +12,16 @@
 #include <stdlib.h>
 
 #define SCREEN_RFRSH_RATE 200U // in ms
+#define SNAKE_BODY 'O'
+#define SNAKE_HEAD 'Q'
+#define SNAKE_FRUIT 'X'
 
 enum {
 	down,
 	up,
 	right,
-	left
+	left,
+	none
 } direction;
 
 enum {
@@ -47,8 +51,8 @@ dir = 2 -> moving right (+y)
 dir = 3 -> moving left (-y)
 */
 
-
-void Init_BTNs(void);
+uint32_t Generate_seed(void);
+void Read_input(void);
 void Refresh_Screen(uint8_t xpos, uint8_t ypos);
 
 

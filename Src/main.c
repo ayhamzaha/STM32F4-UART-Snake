@@ -9,6 +9,7 @@ char buffer[8][17] = {{'-',' ','-',' ','-',' ','-',' ','-',' ','-',' ','-',' ','
 					 					  {'-',' ','-',' ','-',' ','-',' ','-',' ','-',' ','-',' ','-','\n'},
 						  				{'-',' ','-',' ','-',' ','-',' ','-',' ','-',' ','-',' ','-','\n'}};
 
+uint32_t seed = 0;
 uint8_t game_state = start;
 /*
 game_state = 0 -> press to start, click to go to game_state = 1
@@ -21,7 +22,7 @@ uint8_t score = 0;
 uint8_t body_x[64];
 uint8_t body_y[64];
 
-uint8_t dir = 0;
+uint8_t dir = none;
 /*
 dir = 0 -> moving down (-x)
 dir = 1 -> moving up (+x)
@@ -47,17 +48,38 @@ int main(void) {
 	Q_Init(&TxQ);
 	GPIOA->MODER |= (0x1U << (5U * 2U));
 	while(1) {
-		if(game_state == playing) break;
-		if((v1 > 0) || (v2 > 0)) game_state = playing;
+		seed = Generate_seed();
+		Read_input();
+		if(dir != none){ 
+		game_state = playing;
+		srand(seed);
+		score = 7;
+		break;
+		}
 		Refresh_Screen(xpos,ypos);
-		Delay_ms(1000);
+		Delay_ms(SCREEN_RFRSH_RATE);
 	}
 	while(game_state == playing) {
-		if(game_state == end) {
-			NVIC_SystemReset();
-		}
+		Read_input();
+		Refresh_Screen(xpos,ypos);
+		Delay_ms(SCREEN_RFRSH_RATE);
+	}
+	while(1) {
+		GPIOA->ODR |= (0x1U << 0x5U);
+		Refresh_Screen(xpos,ypos);
+		Delay_ms(5000U);
+		NVIC_SystemReset();
+	} // Game over - reset system
+}
+
+uint32_t Generate_seed(void) {
+	uint32_t seed = TIM2->CNT ^ (TIM5->CNT << 16U);
+	return seed ^ (seed >> 11U) ^ (seed << 7U);
+}
+
+void Read_input(void) {
 		ADC1->CR2 |= ADC_CR2_SWSTART; // read inputs
-		Delay_ms(5);
+		Delay_ms(1);
 		if (((v1 < 1500) || (v1 > 3500))) { // check x axis
 			if((v1 < 1500) && (dir != down)) dir = up;
 			else if(dir != up) dir = down;
@@ -82,29 +104,17 @@ int main(void) {
 				if(ypos >= 8) ypos = 7;
 				break;
 		}
-		Refresh_Screen(xpos,ypos);
-		Delay_ms(SCREEN_RFRSH_RATE);
-	}
-	while(1) {
-		GPIOA->ODR |= (0x1U << 0x5U);
-		Refresh_Screen(xpos,ypos);
-		Delay_ms(5000U);
-		NVIC_SystemReset();
-	} // Game over - reset system
 }
 
 void Refresh_Screen(uint8_t xpos, uint8_t ypos) {
 	
-		if(game_state == start) USART_Q_Transmit_NonBlocking(&TxQ,"Move to start!\n",21);
+		if(game_state == start) USART_Q_Transmit_NonBlocking(&TxQ,"Move to start!\n",16);
 		else if(game_state == playing) USART_Q_Transmit_NonBlocking(&TxQ,"SNAKE\n",7);
 		else if(game_state == end) USART_Q_Transmit_NonBlocking(&TxQ,"GAME OVER\n",10);
 		body_x[0] = xpos;
 		body_y[0] = ypos;
-		srand(TIM2->CNT);
-		srand(TIM5->CNT);
 		static uint8_t r_xnum = 4;
-		static uint8_t r_ynum = 0;
-	
+		static uint8_t r_ynum = 4;
 	
 		sprintf(buffer[0],"Score: %u\n",score);
 		USART_Q_Transmit_NonBlocking(&TxQ,buffer[0],strlen(buffer[0]));
@@ -124,20 +134,20 @@ void Refresh_Screen(uint8_t xpos, uint8_t ypos) {
 		}
 		// print snake body
 		for(unsigned i=0; i < score; i++) { // 1 score = 1 body part
-			if((body_x[0] == body_x[i]) && (body_y[0] == body_y[i]) && (i > 0)) { // body + head collide = game over
+			if(body_x[score - i] != body_x[(score - i) - 1]) { // moved on x-axis
+				buffer[body_x[score - i]][body_y[(score - i) - 1]*2U] = SNAKE_BODY; // print body of the snake
+			}
+			else if(body_y[score - i] != body_y[(score - i) - 1]){ // moved on y-axis
+				buffer[body_x[(score - i) - 1]][body_y[score - i]*2U] = SNAKE_BODY; // print body of the snake
+			}
+			if((body_x[0] == body_x[i+1]) && (body_y[0] == body_y[i+1])) { // body + head collide = game over
 				game_state = end; 
 				return;
 			}
-			if(body_x[score - i] != body_x[(score - i) - 1]) { // moved on x-axis
-				buffer[body_x[score - i]][body_y[(score - i) - 1]*2U] = 'X'; // print body of the snake
-			}
-			else if(body_y[score - i] != body_y[(score - i) - 1]){ // moved on y-axis
-				buffer[body_x[(score - i) - 1]][body_y[score - i]*2U] = 'X'; // print body of the snake
-			}
 		}
-		buffer[r_xnum][r_ynum*2U] = 'O'; // fruit
-		buffer[body_x[0]][body_y[0]*2U] = '@'; // print head of the snake
-			
+		buffer[r_xnum][r_ynum*2U] = SNAKE_FRUIT; // fruit
+		buffer[body_x[0]][body_y[0]*2U] = SNAKE_HEAD; // print head of the snake
+		
 		for(uint8_t i = 0; i < 8; i++){
 			USART_Q_Transmit_NonBlocking(&TxQ, buffer[i], strlen(buffer[i]));
 		}
