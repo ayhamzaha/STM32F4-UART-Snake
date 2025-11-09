@@ -1,4 +1,4 @@
-#include "../Inc/uart.h"
+#include "uart.h"
 
 Q_T TxQ;
 

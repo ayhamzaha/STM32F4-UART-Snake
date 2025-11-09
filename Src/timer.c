@@ -1,4 +1,4 @@
-#include "../Inc/timer.h"
+#include "timer.h"
 
 
 void Delay_ms(uint32_t ms) {

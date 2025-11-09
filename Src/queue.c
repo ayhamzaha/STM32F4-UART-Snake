@@ -1,4 +1,4 @@
-#include "../Inc/queue.h"
+#include "queue.h"
 #include <stdint.h>
 #include "cmsis_gcc.h"
 
@@ -54,7 +54,7 @@ int Q_Empty(Q_T *q) {
 	return q->size == 0;
 }
 
-void Q_Init(volatile Q_T *q) {
+void Q_Init(Q_T *q) {
 	unsigned int i;
 	// Set default values to 0 for debugging
 	for(i = 0; i < Q_MAX_SIZE; ++i) {
