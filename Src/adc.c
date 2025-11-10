@@ -17,7 +17,7 @@ void Init_adc(void) {
 	ADC1->SMPR2 |= (1U << 0U) | (1U << 3U); // 15 cycles
 	
 	ADC1->CR1 |= ADC_CR1_SCAN | ADC_CR1_EOCIE; // enables scan mode and EOC int.
-	ADC1->CR2 |= ADC_CR2_EOCS;								// trigger int. after each conv.
+	ADC1->CR2 |= ADC_CR2_EOCS;								 // trigger int. after each conv.
 	
 	// Configure and enable NVIC for ADC
 	NVIC_SetPriority(ADC_IRQn, 3);

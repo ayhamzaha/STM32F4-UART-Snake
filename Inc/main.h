@@ -15,6 +15,7 @@
 #define SNAKE_BODY 'O'
 #define SNAKE_HEAD 'Q'
 #define SNAKE_FRUIT 'X'
+#define SCREEN_SIZE (8U)
 
 enum {
 	down,
@@ -30,7 +31,8 @@ enum {
 	end
 } gamestate;
 
-extern char buffer[8][17];
+extern char buffer[SCREEN_SIZE][(SCREEN_SIZE * 2U) + 1U];
+extern char stage_row[(SCREEN_SIZE * 2U) + 1U];
 extern uint8_t game_state;
 /*
 game_state = 0 -> press to start, click to go to game_state = 1
@@ -40,8 +42,8 @@ game_state = 2 -> game over, click to go to game_state = 0
 extern uint8_t xpos;
 extern uint8_t ypos;
 extern uint8_t score;
-extern uint8_t body_x[64];
-extern uint8_t body_y[64];
+extern uint8_t body_x[SCREEN_SIZE*SCREEN_SIZE];
+extern uint8_t body_y[SCREEN_SIZE*SCREEN_SIZE];
 
 extern uint8_t dir;
 /*
