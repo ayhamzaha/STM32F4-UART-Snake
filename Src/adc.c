@@ -1,11 +1,10 @@
 #include "adc.h"
 
 
-void Init_adc(void) {
-	// Enable peripheral clock for GPIOA and DAC1
+void Init_ADC(void) {
+	// Enable peripheral clock for GPIOA and ADC1
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
 	RCC->APB2ENR |= RCC_APB2ENR_ADC1EN;
-	
 	
 	// Set PA0 and PA1 to analog (11)
 	GPIOA->MODER &= ~((0x3U << (VR_X_AXIS*2U)) | (0x3U << (VR_Y_AXIS*2U)));
