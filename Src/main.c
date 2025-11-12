@@ -26,16 +26,15 @@ uint16_t v1 = 0;
 uint16_t v2 = 0;
 uint8_t flag = 0;
 
-void ADC_IRQHandler(void) { //read 1st conv. then read 2nd conv.
-	if(!flag) v1 = (uint16_t)ADC1->DR;
-	else v2 = (uint16_t)ADC1->DR;
-	flag = ~flag;
+void ADC_IRQHandler(void) { 					//read 1st/2nd conv., then swap
+	if(!flag) v1 = (uint16_t)ADC1->DR; 	// Vrx
+	else v2 = (uint16_t)ADC1->DR; 			// Vry
+	flag = ~flag; 											// switch ADC pin conv.
 }
 											
 
 int main(void) {
 	Init_adc();
-	Init_Timer_us();
 	Init_Timer_ms();
 	// set stage for custom sizing
 	for(unsigned i=0;i < (SCREEN_SIZE*2U);i++){
@@ -45,7 +44,6 @@ int main(void) {
 	stage_row[(SCREEN_SIZE * 2U)] = '\n';
 	Init_USART2(921600);
 	Q_Init(&TxQ);
-	GPIOA->MODER |= (0x1U << (5U * 2U));
 	while(1) {
 		seed = Generate_seed();
 		Read_input();
@@ -63,9 +61,8 @@ int main(void) {
 		Delay_ms(SCREEN_RFRSH_RATE);
 	}
 	while(1) {
-		GPIOA->ODR |= (0x1U << 0x5U);
 		Refresh_Screen(xpos,ypos);
-		Delay_ms(5000U);
+		Delay_ms(10000U);
 		NVIC_SystemReset();
 	} // Game over - reset system
 }
@@ -77,7 +74,7 @@ uint32_t Generate_seed(void) {
 
 void Read_input(void) {
 		ADC1->CR2 |= ADC_CR2_SWSTART; // read inputs
-		Delay_ms(2); // ensure both inputs are read
+		Delay_ms(10); // ensure both inputs are read
 //    sprintf(buffer[0],"xpos: %u\nypos: %u\ndir: %u\n",xpos,ypos,dir);
 //    USART_Q_Transmit_NonBlocking(&TxQ,buffer[0],strlen(buffer[0]));
 // 		Debugging prints ^^^
@@ -97,28 +94,30 @@ void Read_input(void) {
 				dir = left;
 			}
 		}
-		switch(dir){
-			case down: 
-				xpos = (xpos + 1) % SCREEN_SIZE;
-				break;
-			
-			case up:
-				xpos--;
-				if(xpos >= SCREEN_SIZE) xpos = SCREEN_SIZE-1U;
-				break;
-			
-			case left:
-				ypos--;
-				if(ypos >= SCREEN_SIZE) ypos = SCREEN_SIZE-1U;
-				break;
-			
-			case right:
-				ypos = (ypos + 1) % SCREEN_SIZE;
-				break;
-			
-			default:
-				break; // when dir == none
-		}
+		if(game_state != end){
+			switch(dir){
+				case down: 
+					xpos = (xpos + 1) % SCREEN_SIZE;
+					break;
+				
+				case up:
+					xpos--;
+					if(xpos >= SCREEN_SIZE) xpos = SCREEN_SIZE-1U;
+					break;
+				
+				case left:
+					ypos--;
+					if(ypos >= SCREEN_SIZE) ypos = SCREEN_SIZE-1U;
+					break;
+				
+				case right:
+					ypos = (ypos + 1) % SCREEN_SIZE;
+					break;
+				
+				default:
+					break; // when dir == none
+			}
+	}
 }
 
 void Refresh_Screen(uint8_t xpos, uint8_t ypos) {
@@ -142,7 +141,23 @@ void Refresh_Screen(uint8_t xpos, uint8_t ypos) {
 			strcpy(buffer[i],stage_row);
 		}
 		
-		// Find new fruit location and update score
+
+		
+		// Find new snake head/body location and check for game over (collision)
+		for(unsigned i=0; i < score; i++) { // 1 score = 1 snake body part
+			if((body_x[0] == body_x[i+1]) && (body_y[0] == body_y[i+1])) { // body + head collide = game over
+				
+				game_state = end; 
+			}
+			if(body_x[score - i] != body_x[(score - i) - 1]) { // moved on x-axis
+				buffer[body_x[score - i]][body_y[(score - i) - 1]*2U] = SNAKE_BODY; // place body of the snake
+			}
+			else if(body_y[score - i] != body_y[(score - i) - 1]){ // moved on y-axis
+				buffer[body_x[(score - i) - 1]][body_y[score - i]*2U] = SNAKE_BODY; // place body of the snake
+			}
+		}
+		
+				// Find new fruit location and update score
 		if(body_x[0] == r_xnum && body_y[0] == r_ynum) {
 			while(r_xnum == body_x[0]) {
 				r_xnum = (rand() % SCREEN_SIZE);
@@ -151,27 +166,15 @@ void Refresh_Screen(uint8_t xpos, uint8_t ypos) {
 			score++;
 		}
 		
-		// Find new snake head/body location and check for game over (collision)
-		for(unsigned i=0; i < score; i++) { // 1 score = 1 snake body part
-			if(body_x[score - i] != body_x[(score - i) - 1]) { // moved on x-axis
-				buffer[body_x[score - i]][body_y[(score - i) - 1]*2U] = SNAKE_BODY; // place body of the snake
-			}
-			else if(body_y[score - i] != body_y[(score - i) - 1]){ // moved on y-axis
-				buffer[body_x[(score - i) - 1]][body_y[score - i]*2U] = SNAKE_BODY; // place body of the snake
-			}
-			if((body_x[0] == body_x[i+1]) && (body_y[0] == body_y[i+1])) { // body + head collide = game over
-				game_state = end; 
-				return;
-			}
-		}
-		
 		// Print new fruit and snake head locations on stage
 		buffer[r_xnum][r_ynum*2U] = SNAKE_FRUIT; // fruit
-		buffer[body_x[0]][body_y[0]*2U] = SNAKE_HEAD; // print head of the snake
+		if(game_state == end) buffer[body_x[0]][body_y[0]*2U] = '!';
+		else buffer[body_x[0]][body_y[0]*2U] = SNAKE_HEAD; // print head of the snake
 		USART_Q_Transmit_NonBlocking(&TxQ, buffer[0], strlen(buffer[0]));
 		
 		// Print snake body and rest of stage
 		USART_Q_Transmit_NonBlocking(&TxQ,"--------------------------------\n",33);
+		
 		
 		// Update snake body positions
 		for(unsigned i=0; i < score; i++) { 

@@ -6,15 +6,14 @@
 #include "queue.h"
 #include "uart.h"
 #include "adc.h"
-#include "dma.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #define SCREEN_RFRSH_RATE 200U // in ms
 #define SNAKE_BODY 'O'
-#define SNAKE_HEAD 'Q'
-#define SNAKE_FRUIT 'X'
+#define SNAKE_HEAD '6'
+#define SNAKE_FRUIT '@'
 #define SCREEN_SIZE (8U)
 
 enum {
